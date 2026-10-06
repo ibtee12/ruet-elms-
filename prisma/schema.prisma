@@ -1,0 +1,732 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------
+// ENUMS
+// ----------------------------------------------------
+
+enum Role {
+  SUPER_ADMIN
+  DEPT_ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum CourseOfferingStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum OfferingTeacherRole {
+  INSTRUCTOR
+  TA
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  DROPPED
+}
+
+enum MaterialType {
+  FILE
+  LINK
+  VIDEO
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  LATE
+  GRADED
+}
+
+enum NotificationType {
+  URGENT
+  ACADEMIC
+  GENERAL
+  RESULT
+}
+
+enum QuestionType {
+  SINGLE
+  MULTIPLE
+  TRUE_FALSE
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuizGradingMethod {
+  BEST
+  LATEST
+  AVERAGE
+}
+
+enum ThreadCategory {
+  QUESTION
+  DISCUSSION
+  DOUBT
+  RESOURCE
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// ----------------------------------------------------
+// USER & PROFILES
+// ----------------------------------------------------
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  name               String
+  passwordHash       String
+  role               Role
+  isActive           Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
+  lastActiveAt       DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  studentProfile     StudentProfile?
+  teacherProfile     TeacherProfile?
+  offeringTeachers   OfferingTeacher[]
+  enrollments        Enrollment[]
+  auditLogs          AuditLog[]
+  uploadedMaterials  Material[]
+  materialProgress   MaterialProgress[]
+  announcements      Announcement[]
+  createdAssignments Assignment[]
+  submissions        Submission[]
+  gradesGiven        Grade[]
+  gradeHistories     GradeHistory[]
+  notifications      Notification[]
+  activityEvents     ActivityEvent[]
+  createdQuizzes     Quiz[]
+  quizAttempts       QuizAttempt[]
+  threads            Thread[]
+  posts              Post[]
+  analyticsSnapshots AnalyticsSnapshot[]
+  tokenVersion       Int                 @default(1)
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([role])
+  @@index([isActive])
+}
+
+model StudentProfile {
+  id           String     @id @default(cuid())
+  userId       String     @unique
+  user         User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  studentId    String     @unique
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  batch        String
+  level        Int
+  term         Int
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([departmentId])
+  @@index([batch])
+}
+
+model TeacherProfile {
+  id           String     @id @default(cuid())
+  userId       String     @unique
+  user         User       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  employeeId   String     @unique
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  designation  String
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([departmentId])
+}
+
+// ----------------------------------------------------
+// ACADEMIC STRUCTURE
+// ----------------------------------------------------
+
+model Department {
+  id          String   @id @default(cuid())
+  name        String
+  code        String   @unique
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  courses         Course[]
+  studentProfiles StudentProfile[]
+  teacherProfiles TeacherProfile[]
+  announcements   Announcement[]
+}
+
+model Course {
+  id           String     @id @default(cuid())
+  code         String
+  title        String
+  credits      Decimal    @db.Decimal(4, 2)
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  description  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  offerings CourseOffering[]
+
+  @@unique([departmentId, code])
+  @@index([departmentId])
+}
+
+model CourseOffering {
+  id           String               @id @default(cuid())
+  courseId     String
+  course       Course               @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  term         String
+  academicYear String
+  status       CourseOfferingStatus @default(DRAFT)
+  syllabus     String?              @db.Text
+  joinCode     String?              @unique
+  /// When true, join-by-code only admits students whose department matches the course's department.
+  joinRequiresDeptMatch Boolean     @default(false)
+  allowTaGrading             Boolean     @default(false)
+  treatMissingAsZero         Boolean     @default(false)
+  showClassAverageToStudents Boolean     @default(true)
+  createdAt                  DateTime    @default(now())
+  updatedAt                  DateTime    @updatedAt
+
+  sections           Section[]
+  offeringTeachers   OfferingTeacher[]
+  topics             Topic[]
+  modules            Module[]
+  announcements      Announcement[]
+  assignments        Assignment[]
+  activityEvents     ActivityEvent[]
+  quizzes            Quiz[]
+  threads            Thread[]
+  analyticsSnapshots AnalyticsSnapshot[]
+
+  @@index([courseId])
+  @@index([status])
+  @@index([academicYear, term])
+}
+
+model Section {
+  id         String         @id @default(cuid())
+  offeringId String
+  offering   CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  name       String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  enrollments Enrollment[]
+
+  @@unique([offeringId, name])
+  @@index([offeringId])
+}
+
+model OfferingTeacher {
+  id         String              @id @default(cuid())
+  offeringId String
+  offering   CourseOffering      @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  userId     String
+  user       User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  role       OfferingTeacherRole @default(INSTRUCTOR)
+  canGrade   Boolean             @default(false)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@unique([offeringId, userId])
+  @@index([offeringId])
+  @@index([userId])
+}
+
+model Enrollment {
+  id         String           @id @default(cuid())
+  studentId  String
+  student    User             @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  sectionId  String
+  section    Section          @relation(fields: [sectionId], references: [id], onDelete: Restrict)
+  status     EnrollmentStatus @default(ACTIVE)
+  enrolledAt DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@unique([studentId, sectionId])
+  @@index([studentId])
+  @@index([sectionId])
+  @@index([status])
+}
+
+// ----------------------------------------------------
+// COURSE CONTENT & MATERIALS (PART B)
+// ----------------------------------------------------
+
+model Topic {
+  id         String         @id @default(cuid())
+  offeringId String
+  offering   CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  name       String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  materials Material[]
+  questions Question[]
+
+  @@unique([offeringId, name])
+  @@index([offeringId])
+}
+
+model Module {
+  id         String         @id @default(cuid())
+  offeringId String
+  offering   CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  title      String
+  order      Int
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  materials Material[]
+
+  @@index([offeringId])
+  @@index([offeringId, order])
+}
+
+model Material {
+  id           String       @id @default(cuid())
+  moduleId     String
+  module       Module       @relation(fields: [moduleId], references: [id], onDelete: Restrict)
+  title        String
+  description  String?      @db.Text
+  type         MaterialType
+  fileKey      String?
+  originalName String?
+  mime         String?
+  sizeBytes    Int?
+  url          String?
+  topicId      String?
+  topic        Topic?       @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  published    Boolean      @default(false)
+  uploadedById String
+  uploadedBy   User         @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  order        Int
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  progress MaterialProgress[]
+
+  @@index([moduleId])
+  @@index([topicId])
+  @@index([uploadedById])
+  @@index([moduleId, order])
+}
+
+model MaterialProgress {
+  id          String   @id @default(cuid())
+  materialId  String
+  material    Material @relation(fields: [materialId], references: [id], onDelete: Restrict)
+  studentId   String
+  student     User     @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  completedAt DateTime @default(now())
+
+  @@unique([materialId, studentId])
+  @@index([materialId])
+  @@index([studentId])
+}
+
+model Announcement {
+  id           String          @id @default(cuid())
+  offeringId   String?
+  offering     CourseOffering? @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  departmentId String?
+  department   Department?     @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  title        String
+  body         String          @db.Text
+  authorId     String
+  author       User            @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([offeringId, createdAt])
+  @@index([departmentId, createdAt])
+  @@index([authorId])
+}
+
+// ----------------------------------------------------
+// ASSIGNMENTS & GRADING (PART B)
+// ----------------------------------------------------
+
+model Assignment {
+  id                 String         @id @default(cuid())
+  offeringId         String
+  offering           CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  title              String
+  description        String?        @db.Text
+  deadline           DateTime
+  maxMarks           Decimal        @db.Decimal(5, 2)
+  allowedTypes       String[]
+  maxSizeMb          Int
+  lateAllowed        Boolean        @default(false)
+  latePenaltyPercent Int            @default(0)
+  published          Boolean        @default(false)
+  createdById        String
+  createdBy          User           @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  attachments AssignmentAttachment[]
+  submissions Submission[]
+
+  @@index([offeringId])
+  @@index([offeringId, deadline])
+  @@index([createdById])
+}
+
+model AssignmentAttachment {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  fileKey      String
+  originalName String
+  mime         String
+  sizeBytes    Int
+  createdAt    DateTime   @default(now())
+
+  @@index([assignmentId])
+}
+
+model Submission {
+  id               String           @id @default(cuid())
+  assignmentId     String
+  assignment       Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Restrict)
+  studentId        String
+  student          User             @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  status           SubmissionStatus @default(SUBMITTED)
+  currentVersionId String?
+  reopened         Boolean          @default(false)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  versions       SubmissionVersion[]
+  grade          Grade?
+  gradeHistories GradeHistory[]
+
+  @@unique([assignmentId, studentId])
+  @@index([assignmentId, status])
+  @@index([studentId])
+}
+
+model SubmissionVersion {
+  id           String     @id @default(cuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  versionNo    Int
+  fileKey      String
+  originalName String
+  mime         String
+  sizeBytes    Int
+  submittedAt  DateTime   @default(now())
+  isLate       Boolean    @default(false)
+
+  @@unique([submissionId, versionNo])
+  @@index([submissionId])
+}
+
+model Grade {
+  id           String     @id @default(cuid())
+  submissionId String     @unique
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  marks        Decimal    @db.Decimal(5, 2)
+  feedback     String?    @db.Text
+  gradedById   String
+  gradedBy     User       @relation(fields: [gradedById], references: [id], onDelete: Restrict)
+  gradedAt     DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([gradedById])
+}
+
+model GradeHistory {
+  id           String     @id @default(cuid())
+  submissionId String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
+  oldMarks     Decimal?   @db.Decimal(5, 2)
+  newMarks     Decimal    @db.Decimal(5, 2)
+  changedById  String
+  changedBy    User       @relation(fields: [changedById], references: [id], onDelete: Restrict)
+  reason       String     @db.Text
+  changedAt    DateTime   @default(now())
+
+  @@index([submissionId, changedAt])
+  @@index([changedById])
+}
+
+// ----------------------------------------------------
+// QUIZZES & ASSESSMENTS (PART C)
+// ----------------------------------------------------
+
+model Quiz {
+  id                    String         @id @default(cuid())
+  offeringId            String
+  offering              CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  title                 String
+  description           String?        @db.Text
+  durationMin           Int
+  startAt               DateTime
+  endAt                 DateTime
+  maxAttempts           Int            @default(1)
+  shuffleQuestions      Boolean        @default(false)
+  shuffleOptions        Boolean        @default(false)
+  negativeMarkPerWrong  Decimal           @default(0) @db.Decimal(5, 2)
+  showAnswersAfterClose Boolean           @default(false)
+  gradingMethod         QuizGradingMethod @default(BEST)
+  resultsNotified       Boolean           @default(false)
+  published             Boolean           @default(false)
+  createdById           String
+  createdBy             User           @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  questions Question[]
+  attempts  QuizAttempt[]
+
+  @@index([offeringId])
+  @@index([offeringId, startAt, endAt])
+  @@index([createdById])
+}
+
+model Question {
+  id         String              @id @default(cuid())
+  quizId     String
+  quiz       Quiz                @relation(fields: [quizId], references: [id], onDelete: Restrict)
+  text       String              @db.Text
+  type       QuestionType
+  marks      Decimal             @db.Decimal(5, 2)
+  topicId    String?
+  topic      Topic?              @relation(fields: [topicId], references: [id], onDelete: SetNull)
+  difficulty QuestionDifficulty?
+  order      Int
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  options Option[]
+  answers Answer[]
+
+  @@index([quizId])
+  @@index([quizId, order])
+  @@index([topicId])
+}
+
+model Option {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  text       String   @db.Text
+  isCorrect  Boolean
+  order      Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([questionId])
+  @@index([questionId, order])
+}
+
+model QuizAttempt {
+  id          String    @id @default(cuid())
+  quizId      String
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Restrict)
+  studentId   String
+  student     User      @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  score       Decimal?  @db.Decimal(5, 2)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  answers Answer[]
+
+  @@index([quizId, studentId])
+  @@index([studentId])
+}
+
+model Answer {
+  id                String      @id @default(cuid())
+  attemptId         String
+  attempt           QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Restrict)
+  questionId        String
+  question          Question    @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  selectedOptionIds String[]
+  isCorrect         Boolean
+  marksAwarded      Decimal     @db.Decimal(5, 2)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+// ----------------------------------------------------
+// DISCUSSIONS & COMMUNITY (PART C)
+// ----------------------------------------------------
+
+model Thread {
+  id          String         @id @default(cuid())
+  offeringId  String
+  offering    CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  authorId    String
+  author      User           @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  title       String
+  content     String         @db.Text
+  category    ThreadCategory
+  isAnonymous Boolean        @default(false)
+  isLocked    Boolean        @default(false)
+  isPinned    Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+
+  posts Post[]
+
+  @@index([offeringId, createdAt])
+  @@index([offeringId, category])
+  @@index([offeringId, isPinned])
+  @@index([authorId])
+}
+
+model Post {
+  id          String    @id @default(cuid())
+  threadId    String
+  thread      Thread    @relation(fields: [threadId], references: [id], onDelete: Restrict)
+  parentId    String?
+  parent      Post?     @relation("PostReplies", fields: [parentId], references: [id], onDelete: Restrict)
+  replies     Post[]    @relation("PostReplies")
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  content     String    @db.Text
+  isAnonymous Boolean   @default(false)
+  isAccepted  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([threadId, createdAt])
+  @@index([parentId])
+  @@index([authorId])
+}
+
+// ----------------------------------------------------
+// ANALYTICS & STUDENT RISK (PART C)
+// ----------------------------------------------------
+
+model AnalyticsSnapshot {
+  id         String         @id @default(cuid())
+  offeringId String
+  offering   CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  studentId  String
+  student    User           @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  date       DateTime       @db.Date
+  progress   Decimal        @db.Decimal(5, 2)
+  riskScore  Int
+  riskLevel  RiskLevel
+  reasons    Json
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([offeringId, studentId, date])
+  @@index([offeringId, date])
+  @@index([studentId])
+  @@index([offeringId, riskLevel])
+}
+
+// ----------------------------------------------------
+// NOTIFICATIONS & ACTIVITY (PART B)
+// ----------------------------------------------------
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  message   String           @db.Text
+  link      String?
+  isRead    Boolean          @default(false)
+  dedupeKey String?          @unique
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead, createdAt])
+  @@index([userId, createdAt])
+}
+
+model ActivityEvent {
+  id         String         @id @default(cuid())
+  userId     String
+  user       User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+  offeringId String
+  offering   CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Restrict)
+  type       String
+  createdAt  DateTime       @default(now())
+
+  @@index([offeringId, userId, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ----------------------------------------------------
+// SYSTEM & AUDIT
+// ----------------------------------------------------
+
+model Setting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action      String
+  objectType  String
+  objectId    String
+  description String?
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([objectType, objectId])
+}
+
+// ----------------------------------------------------
+// PASSWORD RESET TOKENS
+// ----------------------------------------------------
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tokenHash])
+  @@index([userId, expiresAt])
+}

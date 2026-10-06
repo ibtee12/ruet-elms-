@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+:root {
+  --background: #F7F9FC;
+  --surface: #FFFFFF;
+  --surface-muted: #F1F5F9;
+  --border: #E2E8F0;
+  --foreground: #1E293B;
+  --muted: #64748B;
+  --navy: #0F2A4A;
+  --primary: #0B7D7C;
+  --primary-hover: #096968;
+  --primary-foreground: #FFFFFF;
+  --teal-accent: #0EA5A4;
+  --warning: #F59E0B;
+  --success: #16A34A;
+  --success-text: #15803D;
+  --danger: #DC2626;
+  --info: #2563EB;
+  --ring: #0EA5A4;
+  --radius: 0.625rem;
+}
+
+.dark {
+  --background: #0B1220;
+  --surface: #111A2E;
+  --surface-muted: #16223A;
+  --border: #22304A;
+  --foreground: #E5EAF3;
+  --muted: #94A3B8;
+  --navy: #0A1B33;
+  --primary: #2DD4BF;
+  --primary-hover: #5EEAD4;
+  --primary-foreground: #06201F;
+  --warning: #FBBF24;
+  --success: #4ADE80;
+  --success-text: #4ADE80;
+  --danger: #F87171;
+  --info: #60A5FA;
+  --ring: #2DD4BF;
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-navy: var(--navy);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-teal-accent: var(--teal-accent);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-success-text: var(--success-text);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: var(--font-inter), var(--font-hind-siliguri), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
