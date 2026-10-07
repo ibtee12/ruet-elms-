@@ -5,20 +5,27 @@ import { getToken } from "next-auth/jwt";
 export async function middleware(request: NextRequest) {
   const { pathname, search } = request.nextUrl;
 
+  // In production, block the dev design-system showcase
+  if (pathname.startsWith("/dev") && process.env.NODE_ENV === "production") {
+    const forbiddenUrl = new URL("/forbidden", request.url);
+    return NextResponse.redirect(forbiddenUrl);
+  }
+
   // 1. Static files, Next internals, icons, health check, and auth callbacks
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api/auth") ||
     pathname.startsWith("/api/health") ||
-    pathname.startsWith("/dev") || // design system showcase
+    (pathname.startsWith("/dev") && process.env.NODE_ENV !== "production") ||
     pathname === "/favicon.ico" ||
     pathname.includes(".")
   ) {
     return NextResponse.next();
   }
 
-  // 2. Public auth and error pages
+  // 2. Public auth and error pages, and public homepage
   if (
+    pathname === "/" ||
     pathname === "/login" ||
     pathname === "/forgot-password" ||
     pathname.startsWith("/reset-password") ||

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { Role } from "@prisma/client";
 import { getStudentCourseProgressData } from "@/services/student-progress";
+import { canViewOffering } from "@/lib/auth/guards";
 
 export async function GET(
   req: NextRequest,
@@ -14,7 +15,16 @@ export async function GET(
   }
 
   const { offeringId } = await params;
-  const user = session.user;
+  const user = session.user as { id: string; role: Role };
+
+  // Object-level authorization: caller must have access to the offering
+  const allowed = await canViewOffering(user, offeringId);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "Forbidden: You are not authorized to view progress for this course offering." },
+      { status: 403 }
+    );
+  }
 
   // Student can only view their own progress
   const targetStudentId =

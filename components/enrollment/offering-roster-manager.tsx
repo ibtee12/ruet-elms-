@@ -567,13 +567,17 @@ export function OfferingRosterManager({
               </div>
 
               {/* Mode Toggle */}
-              <div className="flex items-center gap-2 border-b border-border pb-2">
+              <div className="flex items-center gap-2 border-b border-border pb-2" role="tablist" aria-label="Input mode">
                 <button
                   type="button"
+                  role="tab"
+                  id="tab-paste-mode"
+                  aria-selected={addMode === "paste"}
+                  aria-controls="panel-paste-mode"
                   onClick={() => setAddMode("paste")}
                   className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
                     addMode === "paste"
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted hover:text-foreground"
                   }`}
                 >
@@ -581,10 +585,14 @@ export function OfferingRosterManager({
                 </button>
                 <button
                   type="button"
+                  role="tab"
+                  id="tab-csv-mode"
+                  aria-selected={addMode === "csv"}
+                  aria-controls="panel-csv-mode"
                   onClick={() => setAddMode("csv")}
                   className={`text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors ${
                     addMode === "csv"
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-primary text-primary-foreground shadow-xs"
                       : "text-muted hover:text-foreground"
                   }`}
                 >
@@ -593,7 +601,7 @@ export function OfferingRosterManager({
               </div>
 
               {addMode === "paste" ? (
-                <div>
+                <div id="panel-paste-mode" role="tabpanel" aria-labelledby="tab-paste-mode">
                   <label htmlFor="paste-input" className="text-xs text-muted block mb-1.5">
                     Paste student roll numbers separated by commas, spaces, or newlines:
                   </label>
@@ -610,7 +618,7 @@ export function OfferingRosterManager({
                   />
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div id="panel-csv-mode" role="tabpanel" aria-labelledby="tab-csv-mode" className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted">Upload CSV with studentId column:</span>
                     <Button

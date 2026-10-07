@@ -157,3 +157,20 @@ export const discussionRateLimiter: RateLimiter = new InMemoryRateLimiter({
   maxAttempts: 5,
   windowMs: 60 * 1000, // 1 minute
 });
+
+/**
+ * Password reset rate limiter: 5 requests per 15 minutes per IP or email.
+ */
+export const passwordResetRateLimiter: RateLimiter = new InMemoryRateLimiter({
+  maxAttempts: 5,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+});
+
+/**
+ * File upload rate limiter: 15 uploads per minute per user.
+ */
+export const uploadRateLimiter: RateLimiter = new InMemoryRateLimiter({
+  maxAttempts: 15,
+  windowMs: 60 * 1000, // 1 minute
+});
+

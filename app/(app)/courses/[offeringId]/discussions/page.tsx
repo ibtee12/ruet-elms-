@@ -24,8 +24,8 @@ export default async function StudentCourseDiscussionsPage({
     <div className="space-y-6">
       <OfferingDiscussionsManager
         offeringId={offeringId}
-        courseCode={workspace.offering.course.code}
-        courseTitle={workspace.offering.course.title}
+        courseCode={workspace.code}
+        courseTitle={workspace.title}
         initialThreads={threads}
         currentUserId={caller.id}
         currentUserRole={caller.role}

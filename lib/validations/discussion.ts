@@ -14,7 +14,7 @@ export const createThreadSchema = z.object({
     .min(1, "Thread content is required")
     .max(5000, "Thread content cannot exceed 5,000 characters"),
   category: z.nativeEnum(ThreadCategory, {
-    errorMap: () => ({ message: "Please select a valid thread category" }),
+    message: "Please select a valid thread category",
   }),
   isAnonymous: z.boolean().default(false),
 });

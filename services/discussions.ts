@@ -472,7 +472,7 @@ export async function createDiscussionThread(
   const validated = createThreadSchema.parse(input);
 
   // Assert user is enrolled or teacher
-  await assertCanAccessDiscussion(caller.id, caller.role, validated.offeringId);
+  const access = await assertCanAccessDiscussion(caller.id, caller.role, validated.offeringId);
   await assertOfferingWritable(validated.offeringId);
 
   // Enforce rate limiting: 5 posts per minute
@@ -531,7 +531,10 @@ export async function createDiscussionThread(
     });
   }
 
-  return thread;
+  return {
+    ...thread,
+    authorId: thread.isAnonymous && !access.isModerator ? null : thread.authorId,
+  };
 }
 
 /**
@@ -564,7 +567,7 @@ export async function createDiscussionPost(
     );
   }
 
-  await assertCanAccessDiscussion(caller.id, caller.role, thread.offeringId);
+  const access = await assertCanAccessDiscussion(caller.id, caller.role, thread.offeringId);
   await assertOfferingWritable(thread.offeringId);
 
   // Support 1 level of nesting: If parentId is specified, ensure it resolves to a root post
@@ -634,7 +637,10 @@ export async function createDiscussionPost(
     });
   }
 
-  return post;
+  return {
+    ...post,
+    authorId: post.isAnonymous && !access.isModerator ? null : post.authorId,
+  };
 }
 
 /**

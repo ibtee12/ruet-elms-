@@ -4,6 +4,7 @@ import { Role } from "@prisma/client";
 import { requireRole } from "@/lib/auth/session";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/shared/page-header";
+import { assertDeptAccess } from "@/lib/auth/guards";
 import { getOfferingDetailAction } from "@/actions/offerings";
 import { getRosterAction } from "@/actions/enrollment";
 import {
@@ -31,6 +32,9 @@ export default async function OfferingDetailPage({
     getOfferingDetailAction(id),
     getRosterAction(id),
   ]);
+
+  // Object-level isolation: assert DEPT_ADMIN has authority over this offering's department
+  await assertDeptAccess(caller.id, offering.course.departmentId);
 
   // Fetch teachers from the offering's department for assignment dialog
   const departmentTeachers = await prisma.teacherProfile.findMany({

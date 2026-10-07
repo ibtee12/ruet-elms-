@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useState } from "react";
 import Link from "next/link";
+import { RiskLevel } from "@prisma/client";
 import { TeacherOfferingAnalyticsData } from "@/services/teacher-analytics";
 import { StatCard } from "@/components/shared/stat-card";
 import { formatDhaka, formatRelative } from "@/lib/datetime";

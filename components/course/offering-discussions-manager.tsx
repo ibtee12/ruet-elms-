@@ -333,8 +333,10 @@ export function OfferingDiscussionsManager({
               ? "Try adjusting your search keywords or clear category filters."
               : "Be the first to start an academic discussion or ask a question!"
           }
-          actionLabel="Create Thread"
-          onAction={() => setIsCreateOpen(true)}
+          action={{
+            label: "Create Thread",
+            onClick: () => setIsCreateOpen(true),
+          }}
         />
       ) : (
         <div className="space-y-3">
@@ -585,14 +587,14 @@ export function OfferingDiscussionsManager({
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
-        isOpen={Boolean(deletingThreadId)}
+        open={Boolean(deletingThreadId)}
+        onOpenChange={(open) => !open && setDeletingThreadId(null)}
         title="Delete Discussion Thread?"
         description="Are you sure you want to delete this thread? This will soft delete the thread and hide all replies from participants."
         confirmLabel="Delete Thread"
-        variant="danger"
+        isDestructive
         isLoading={isDeleting}
         onConfirm={handleDeleteConfirm}
-        onCancel={() => setDeletingThreadId(null)}
       />
     </div>
   );

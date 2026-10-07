@@ -77,45 +77,48 @@ describe("Prisma Schema Models & Enums (Complete Catalog)", () => {
   });
 
   it("can query all database tables without error", async () => {
-    const counts = await Promise.all([
+    const tables = [
       // Part A
-      prisma.user.count(),
-      prisma.studentProfile.count(),
-      prisma.teacherProfile.count(),
-      prisma.department.count(),
-      prisma.course.count(),
-      prisma.courseOffering.count(),
-      prisma.section.count(),
-      prisma.offeringTeacher.count(),
-      prisma.enrollment.count(),
-      prisma.setting.count(),
-      prisma.auditLog.count(),
+      () => prisma.user.count(),
+      () => prisma.studentProfile.count(),
+      () => prisma.teacherProfile.count(),
+      () => prisma.department.count(),
+      () => prisma.course.count(),
+      () => prisma.courseOffering.count(),
+      () => prisma.section.count(),
+      () => prisma.offeringTeacher.count(),
+      () => prisma.enrollment.count(),
+      () => prisma.setting.count(),
+      () => prisma.auditLog.count(),
       // Part B
-      prisma.topic.count(),
-      prisma.module.count(),
-      prisma.material.count(),
-      prisma.materialProgress.count(),
-      prisma.announcement.count(),
-      prisma.assignment.count(),
-      prisma.assignmentAttachment.count(),
-      prisma.submission.count(),
-      prisma.submissionVersion.count(),
-      prisma.grade.count(),
-      prisma.gradeHistory.count(),
-      prisma.notification.count(),
-      prisma.activityEvent.count(),
+      () => prisma.topic.count(),
+      () => prisma.module.count(),
+      () => prisma.material.count(),
+      () => prisma.materialProgress.count(),
+      () => prisma.announcement.count(),
+      () => prisma.assignment.count(),
+      () => prisma.assignmentAttachment.count(),
+      () => prisma.submission.count(),
+      () => prisma.submissionVersion.count(),
+      () => prisma.grade.count(),
+      () => prisma.gradeHistory.count(),
+      () => prisma.notification.count(),
+      () => prisma.activityEvent.count(),
       // Part C
-      prisma.quiz.count(),
-      prisma.question.count(),
-      prisma.option.count(),
-      prisma.quizAttempt.count(),
-      prisma.answer.count(),
-      prisma.thread.count(),
-      prisma.post.count(),
-      prisma.analyticsSnapshot.count(),
-    ]);
+      () => prisma.quiz.count(),
+      () => prisma.question.count(),
+      () => prisma.option.count(),
+      () => prisma.quizAttempt.count(),
+      () => prisma.answer.count(),
+      () => prisma.thread.count(),
+      () => prisma.post.count(),
+      () => prisma.analyticsSnapshot.count(),
+    ];
 
-    counts.forEach((count) => expect(count).toBeGreaterThanOrEqual(0));
+    for (const query of tables) {
+      const count = await query();
+      expect(count).toBeGreaterThanOrEqual(0);
+    }
   });
 
   describe("Announcement Scope Validation", () => {

@@ -24,6 +24,7 @@ export function ChangePasswordForm({ isForced, context }: ChangePasswordFormProp
   const [confirmPassword, setConfirmPassword] = React.useState("");
   const [showCurrent, setShowCurrent] = React.useState(false);
   const [showNew, setShowNew] = React.useState(false);
+  const [showConfirm, setShowConfirm] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
@@ -92,6 +93,7 @@ export function ChangePasswordForm({ isForced, context }: ChangePasswordFormProp
       {errorMessage && (
         <div
           role="alert"
+          aria-live="polite"
           className="p-3.5 rounded-xl border border-danger/30 bg-danger/10 text-danger text-sm flex items-center gap-2"
         >
           <AlertCircle className="w-4 h-4 shrink-0" />
@@ -159,7 +161,7 @@ export function ChangePasswordForm({ isForced, context }: ChangePasswordFormProp
             required
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="At least 10 characters"
+            placeholder="At least 8 characters"
             disabled={isLoading}
             className="w-full rounded-[10px] border border-border bg-surface pl-3.5 pr-11 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           />
@@ -186,18 +188,29 @@ export function ChangePasswordForm({ isForced, context }: ChangePasswordFormProp
         >
           Confirm New Password <span className="text-danger">*</span>
         </label>
-        <input
-          id="confirmPassword"
-          name="confirmPassword"
-          type={showNew ? "text" : "password"}
-          autoComplete="new-password"
-          required
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          placeholder="Re-enter new password"
-          disabled={isLoading}
-          className="w-full rounded-[10px] border border-border bg-surface px-3.5 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        />
+        <div className="relative">
+          <input
+            id="confirmPassword"
+            name="confirmPassword"
+            type={showConfirm ? "text" : "password"}
+            autoComplete="new-password"
+            required
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Re-enter new password"
+            disabled={isLoading}
+            className="w-full rounded-[10px] border border-border bg-surface pl-3.5 pr-11 py-2.5 text-base sm:text-sm text-foreground placeholder:text-muted/60 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirm(!showConfirm)}
+            disabled={isLoading}
+            aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-muted hover:text-foreground focus-visible:outline-none rounded-md"
+          >
+            {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+          </button>
+        </div>
       </div>
 
       <Button

@@ -2,11 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Role } from "@prisma/client";
 import { ROLE_NAVIGATION, NavItem } from "@/lib/navigation";
 import {
-  GraduationCap,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
@@ -45,8 +45,13 @@ export function Sidebar({
             href="/dashboard"
             className="flex items-center gap-3 overflow-hidden group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 rounded-lg p-1"
           >
-            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-white shrink-0 shadow-sm group-hover:scale-105 transition-transform">
-              <GraduationCap className="w-5 h-5" />
+            <div className="relative w-8 h-10 shrink-0 group-hover:scale-105 transition-transform">
+              <Image
+                src="/images/ruet-logo.webp"
+                alt="RUET Logo"
+                fill
+                className="object-contain"
+              />
             </div>
             {!isCollapsed && (
               <div className="truncate">

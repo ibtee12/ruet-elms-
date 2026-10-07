@@ -19,7 +19,7 @@ export default async function StudentThreadDetailPage({
   return (
     <ThreadDetailView
       offeringId={offeringId}
-      courseCode={workspace.offering.course.code}
+      courseCode={workspace.code}
       thread={thread}
       currentUserId={caller.id}
       currentUserRole={caller.role}

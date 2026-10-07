@@ -187,38 +187,44 @@ export async function buildDeptScopedWhereConditions(
   let deptAnnouncementIds: string[] = [];
 
   if (deptOfferingIds.length > 0) {
-    const [assignments, quizzes, materials, enrollments, threads, announcements] =
-      await Promise.all([
-        prisma.assignment.findMany({
-          where: { offeringId: { in: deptOfferingIds } },
-          select: { id: true },
-        }),
-        prisma.quiz.findMany({
-          where: { offeringId: { in: deptOfferingIds } },
-          select: { id: true },
-        }),
-        prisma.material.findMany({
-          where: { module: { offeringId: { in: deptOfferingIds } } },
-          select: { id: true },
-        }),
-        prisma.enrollment.findMany({
-          where: { section: { offeringId: { in: deptOfferingIds } } },
-          select: { id: true },
-        }),
-        prisma.thread.findMany({
-          where: { offeringId: { in: deptOfferingIds } },
-          select: { id: true },
-        }),
-        prisma.announcement.findMany({
-          where: {
-            OR: [
-              { departmentId },
-              { offeringId: { in: deptOfferingIds } },
-            ],
-          },
-          select: { id: true },
-        }),
-      ]);
+    const [assignments, quizzes, materials, enrollments, threads, announcements]: [
+      { id: string }[],
+      { id: string }[],
+      { id: string }[],
+      { id: string }[],
+      { id: string }[],
+      { id: string }[],
+    ] = await Promise.all([
+      prisma.assignment.findMany({
+        where: { offeringId: { in: deptOfferingIds } },
+        select: { id: true },
+      }),
+      prisma.quiz.findMany({
+        where: { offeringId: { in: deptOfferingIds } },
+        select: { id: true },
+      }),
+      prisma.material.findMany({
+        where: { module: { offeringId: { in: deptOfferingIds } } },
+        select: { id: true },
+      }),
+      prisma.enrollment.findMany({
+        where: { section: { offeringId: { in: deptOfferingIds } } },
+        select: { id: true },
+      }),
+      prisma.thread.findMany({
+        where: { offeringId: { in: deptOfferingIds } },
+        select: { id: true },
+      }),
+      prisma.announcement.findMany({
+        where: {
+          OR: [
+            { departmentId },
+            { offeringId: { in: deptOfferingIds } },
+          ],
+        },
+        select: { id: true },
+      }),
+    ]);
 
     deptAssignmentIds = assignments.map((a) => a.id);
     deptQuizIds = quizzes.map((q) => q.id);

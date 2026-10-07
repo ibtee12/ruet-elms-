@@ -1,6 +1,7 @@
 import * as React from "react";
 import Link from "next/link";
-import { GraduationCap, ArrowLeft, ShieldAlert } from "lucide-react";
+import Image from "next/image";
+import { ArrowLeft, ShieldAlert } from "lucide-react";
 import { validateResetToken } from "@/services/password-reset.service";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { ResetPasswordForm } from "./reset-password-form";
@@ -17,9 +18,14 @@ export default async function ResetPasswordPage({ params }: PageProps) {
     <main className="min-h-screen flex flex-col justify-between p-6 sm:p-10 bg-background text-foreground">
       {/* Header */}
       <header className="flex items-center justify-between w-full max-w-xl mx-auto">
-        <Link href="/login" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105">
-            <GraduationCap className="w-6 h-6" />
+        <Link href="/login" className="flex items-center gap-3 group">
+          <div className="relative w-8 h-10 shrink-0 transition-transform group-hover:scale-105">
+            <Image
+              src="/images/ruet-logo.webp"
+              alt="RUET Logo"
+              fill
+              className="object-contain"
+            />
           </div>
           <div>
             <span className="text-xs uppercase tracking-widest text-primary font-semibold block leading-tight">

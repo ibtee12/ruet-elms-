@@ -459,14 +459,14 @@ export async function enrollStudentAction(
     if (!section) throw new ValidationError("Choose a section that belongs to this offering.");
 
     const student = await prisma.user.findFirst({
-      where: { id: studentUserId, role: Role.STUDENT },
+      where: { id: validated.studentUserId, role: Role.STUDENT },
       select: { id: true, isActive: true },
     });
     if (!student) throw new NotFoundError("Student not found.");
     if (!student.isActive) throw new ValidationError("Student account is deactivated.");
 
     const active = await prisma.enrollment.findFirst({
-      where: { studentId: studentUserId, status: "ACTIVE", section: { offeringId } },
+      where: { studentId: validated.studentUserId, status: "ACTIVE", section: { offeringId: validated.offeringId } },
       select: { section: { select: { name: true } } },
     });
     if (active) {
@@ -480,14 +480,14 @@ export async function enrollStudentAction(
     const ip = await clientIp();
     const enrollment = await prisma.$transaction(async (tx) => {
       const dropped = await tx.enrollment.findUnique({
-        where: { studentId_sectionId: { studentId: studentUserId, sectionId } },
+        where: { studentId_sectionId: { studentId: validated.studentUserId, sectionId: validated.sectionId } },
       });
       const row = dropped
         ? await tx.enrollment.update({
             where: { id: dropped.id },
             data: { status: EnrollmentStatus.ACTIVE, enrolledAt: new Date() },
           })
-        : await tx.enrollment.create({ data: { studentId: studentUserId, sectionId } });
+        : await tx.enrollment.create({ data: { studentId: validated.studentUserId, sectionId: validated.sectionId } });
 
       await tx.auditLog.create({
         data: {
@@ -502,7 +502,7 @@ export async function enrollStudentAction(
       return row;
     });
 
-    revalidateRoster(offeringId);
+    revalidateRoster(validated.offeringId);
     return { success: true, enrollmentId: enrollment.id };
   } catch (e) {
     return toFailure(e);
@@ -656,7 +656,7 @@ export async function moveEnrollmentsAction(
     // Every id must belong to THIS offering (prevents cross-offering tampering via crafted ids).
     if (
       enrollments.length !== ids.length ||
-      enrollments.some((e) => e.section.offeringId !== offeringId)
+      enrollments.some((e) => e.section.offeringId !== validated.offeringId)
     ) {
       throw new ForbiddenError("One or more selected enrollments do not belong to this offering.");
     }
@@ -706,7 +706,7 @@ export async function moveEnrollmentsAction(
           data: {
             action: "ENROLLMENT_MOVED",
             objectType: "CourseOffering",
-            objectId: offeringId,
+            objectId: validated.offeringId,
             userId: caller.id,
             description: `Moved ${toMove.length} student(s) to ${target.name} (${unchanged} already there)`,
             ip,
@@ -716,7 +716,7 @@ export async function moveEnrollmentsAction(
       { timeout: 30_000 }
     );
 
-    revalidateRoster(offeringId);
+    revalidateRoster(validated.offeringId);
     return { success: true, moved: toMove.length, unchanged };
   } catch (e) {
     return toFailure(e);

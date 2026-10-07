@@ -370,20 +370,32 @@ export async function getTeacherOfferingAnalytics(
     _max: { score: true },
   });
 
-  // Find exact attempt IDs corresponding to best scores
+  // Find exact attempt IDs corresponding to best scores without N+1 query loop
+  const candidateAttempts = await prisma.quizAttempt.findMany({
+    where: {
+      studentId: { in: enrollments.map((e) => e.student.id) },
+      quiz: { offeringId, published: true },
+      submittedAt: { not: null },
+    },
+    select: {
+      id: true,
+      studentId: true,
+      quizId: true,
+      score: true,
+    },
+  });
+
   const bestAttemptIds: string[] = [];
   for (const ba of allBestAttempts) {
     if (ba._max.score === null) continue;
-    const att = await prisma.quizAttempt.findFirst({
-      where: {
-        studentId: ba.studentId,
-        quizId: ba.quizId,
-        score: ba._max.score,
-        submittedAt: { not: null },
-      },
-      select: { id: true },
-    });
-    if (att) bestAttemptIds.push(att.id);
+    const match = candidateAttempts.find(
+      (a) =>
+        a.studentId === ba.studentId &&
+        a.quizId === ba.quizId &&
+        a.score !== null &&
+        Number(a.score) === Number(ba._max.score)
+    );
+    if (match) bestAttemptIds.push(match.id);
   }
 
   const topicMarksMap = new Map<

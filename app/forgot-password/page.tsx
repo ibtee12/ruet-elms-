@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { GraduationCap, ArrowLeft, Mail, CheckCircle2, AlertCircle } from "lucide-react";
+import Image from "next/image";
+import { ArrowLeft, Mail, CheckCircle2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { requestPasswordResetAction } from "@/actions/auth";
@@ -27,7 +28,14 @@ export default function ForgotPasswordPage() {
 
     try {
       const result = await requestPasswordResetAction(trimmedEmail);
-      setSubmittedMessage(result.message);
+      if (!result.success && "error" in result && result.error) {
+        setErrorMessage(result.error);
+        return;
+      }
+      setSubmittedMessage(
+        result.message ||
+          "If an account exists with that email address, you will receive password reset instructions shortly."
+      );
     } catch {
       // Even on unexpected errors, preserve constant generic response
       setSubmittedMessage(
@@ -42,9 +50,14 @@ export default function ForgotPasswordPage() {
     <main className="min-h-screen flex flex-col justify-between p-6 sm:p-10 bg-background text-foreground">
       {/* Top bar with RUET ELMS branding & Theme toggle */}
       <header className="flex items-center justify-between w-full max-w-xl mx-auto">
-        <Link href="/login" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm transition-transform group-hover:scale-105">
-            <GraduationCap className="w-6 h-6" />
+        <Link href="/login" className="flex items-center gap-3 group">
+          <div className="relative w-8 h-10 shrink-0 transition-transform group-hover:scale-105">
+            <Image
+              src="/images/ruet-logo.webp"
+              alt="RUET Logo"
+              fill
+              className="object-contain"
+            />
           </div>
           <div>
             <span className="text-xs uppercase tracking-widest text-primary font-semibold block leading-tight">

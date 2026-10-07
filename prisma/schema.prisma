@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ----------------------------------------------------
@@ -124,6 +125,7 @@ model User {
 
   @@index([role])
   @@index([isActive])
+  @@index([lastActiveAt])
 }
 
 model StudentProfile {
@@ -224,6 +226,7 @@ model CourseOffering {
   @@index([courseId])
   @@index([status])
   @@index([academicYear, term])
+  @@index([courseId, status])
 }
 
 model Section {
@@ -270,6 +273,8 @@ model Enrollment {
   @@index([studentId])
   @@index([sectionId])
   @@index([status])
+  @@index([studentId, status])
+  @@index([sectionId, status])
 }
 
 // ----------------------------------------------------
@@ -333,6 +338,7 @@ model Material {
   @@index([topicId])
   @@index([uploadedById])
   @@index([moduleId, order])
+  @@index([published])
 }
 
 model MaterialProgress {
@@ -394,6 +400,7 @@ model Assignment {
   @@index([offeringId])
   @@index([offeringId, deadline])
   @@index([createdById])
+  @@index([offeringId, published])
 }
 
 model AssignmentAttachment {
@@ -428,6 +435,7 @@ model Submission {
   @@unique([assignmentId, studentId])
   @@index([assignmentId, status])
   @@index([studentId])
+  @@index([studentId, status])
 }
 
 model SubmissionVersion {
@@ -507,6 +515,7 @@ model Quiz {
   @@index([offeringId])
   @@index([offeringId, startAt, endAt])
   @@index([createdById])
+  @@index([offeringId, published])
 }
 
 model Question {
@@ -561,6 +570,7 @@ model QuizAttempt {
 
   @@index([quizId, studentId])
   @@index([studentId])
+  @@index([quizId, submittedAt])
 }
 
 model Answer {
@@ -606,6 +616,7 @@ model Thread {
   @@index([offeringId, category])
   @@index([offeringId, isPinned])
   @@index([authorId])
+  @@index([offeringId, deletedAt])
 }
 
 model Post {
@@ -627,6 +638,7 @@ model Post {
   @@index([threadId, createdAt])
   @@index([parentId])
   @@index([authorId])
+  @@index([threadId, deletedAt])
 }
 
 // ----------------------------------------------------
@@ -684,6 +696,7 @@ model ActivityEvent {
 
   @@index([offeringId, userId, createdAt])
   @@index([userId, createdAt])
+  @@index([offeringId, createdAt])
 }
 
 // ----------------------------------------------------

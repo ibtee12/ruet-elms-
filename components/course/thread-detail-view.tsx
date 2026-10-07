@@ -560,7 +560,8 @@ export function ThreadDetailView({
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog
-        isOpen={Boolean(deleteTarget)}
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => !open && setDeleteTarget(null)}
         title={
           deleteTarget?.type === "thread"
             ? "Delete Discussion Thread?"
@@ -572,10 +573,9 @@ export function ThreadDetailView({
             : "This will soft delete this reply from the discussion thread."
         }
         confirmLabel="Confirm Delete"
-        variant="danger"
+        isDestructive
         isLoading={isDeleting}
         onConfirm={handleDeleteConfirm}
-        onCancel={() => setDeleteTarget(null)}
       />
     </div>
   );

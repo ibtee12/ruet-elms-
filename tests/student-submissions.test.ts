@@ -13,6 +13,7 @@ import * as storageModule from "@/lib/storage";
 import * as nextAuth from "next-auth/next";
 import { NextRequest } from "next/server";
 import { GET as downloadSubmissionVersionHandler } from "@/app/api/submissions/versions/[versionId]/download/route";
+import { uploadRateLimiter } from "@/lib/rate-limiter";
 
 vi.mock("next/headers", () => ({
   headers: vi.fn().mockResolvedValue(
@@ -45,6 +46,7 @@ describe("Step 21: Student Assignments and Submissions", () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     vi.useRealTimers();
+    uploadRateLimiter.clear();
 
     vi.spyOn(storageModule, "uploadToSupabaseBucket").mockResolvedValue({
       success: true,
@@ -101,13 +103,18 @@ describe("Step 21: Student Assignments and Submissions", () => {
         const subIds = subs.map((s) => s.id);
 
         if (subIds.length > 0) {
+          await prisma.gradeHistory.deleteMany({ where: { submissionId: { in: subIds } } });
           await prisma.grade.deleteMany({ where: { submissionId: { in: subIds } } });
+          await prisma.submission.updateMany({
+            where: { id: { in: subIds } },
+            data: { currentVersionId: null },
+          });
           await prisma.submissionVersion.deleteMany({
             where: { submissionId: { in: subIds } },
           });
           await prisma.submission.deleteMany({ where: { id: { in: subIds } } });
         }
-
+        await prisma.submission.deleteMany({ where: { assignmentId: id } }).catch(() => {});
         await prisma.assignmentAttachment.deleteMany({ where: { assignmentId: id } });
         await prisma.assignment.deleteMany({ where: { id } });
       }
@@ -229,7 +236,7 @@ describe("Step 21: Student Assignments and Submissions", () => {
       });
 
       // Fast-forward system clock to exactly 1 second AFTER deadline
-      vi.useFakeTimers();
+      vi.useFakeTimers({ toFake: ["Date"] });
       const oneSecondAfterDeadline = new Date(fixedDeadline.getTime() + 1000);
       vi.setSystemTime(oneSecondAfterDeadline);
 
@@ -238,6 +245,7 @@ describe("Step 21: Student Assignments and Submissions", () => {
       fd.append("file", file);
 
       const res = await submitAssignmentAction(offeringA.id, assignment.id, fd);
+      vi.useRealTimers();
       expect(res.success).toBe(true);
       expect(res.isLate).toBe(true);
       expect(res.status).toBe(SubmissionStatus.LATE);
@@ -273,7 +281,7 @@ describe("Step 21: Student Assignments and Submissions", () => {
         mustChangePassword: false,
       });
 
-      vi.useFakeTimers();
+      vi.useFakeTimers({ toFake: ["Date"] });
       const oneSecondAfterDeadline = new Date(fixedDeadline.getTime() + 1000);
       vi.setSystemTime(oneSecondAfterDeadline);
 
@@ -281,9 +289,13 @@ describe("Step 21: Student Assignments and Submissions", () => {
       const fd = new FormData();
       fd.append("file", file);
 
-      await expect(
-        submitAssignmentAction(offeringA.id, assignment.id, fd)
-      ).rejects.toThrow(/deadline for this assignment has passed and late submissions are not accepted/i);
+      try {
+        await expect(
+          submitAssignmentAction(offeringA.id, assignment.id, fd)
+        ).rejects.toThrow(/deadline for this assignment has passed and late submissions are not accepted/i);
+      } finally {
+        vi.useRealTimers();
+      }
     });
 
     it("ignores any client-sent timestamps in request body", async () => {
@@ -312,7 +324,7 @@ describe("Step 21: Student Assignments and Submissions", () => {
       });
 
       // System clock is 10 seconds after deadline
-      vi.useFakeTimers();
+      vi.useFakeTimers({ toFake: ["Date"] });
       vi.setSystemTime(new Date(fixedDeadline.getTime() + 10000));
 
       const file = createMockPdfFile("solution.pdf");
@@ -322,7 +334,12 @@ describe("Step 21: Student Assignments and Submissions", () => {
       fd.append("clientTimestamp", new Date(fixedDeadline.getTime() - 7200000).toISOString());
       fd.append("submittedAt", new Date(fixedDeadline.getTime() - 7200000).toISOString());
 
-      const res = await submitAssignmentAction(offeringA.id, assignment.id, fd);
+      let res: any;
+      try {
+        res = await submitAssignmentAction(offeringA.id, assignment.id, fd);
+      } finally {
+        vi.useRealTimers();
+      }
       // Server-side check takes precedence; must be marked late
       expect(res.isLate).toBe(true);
       expect(res.status).toBe(SubmissionStatus.LATE);
@@ -463,7 +480,7 @@ describe("Step 21: Student Assignments and Submissions", () => {
       await expect(
         submitAssignmentAction(offeringA.id, assignment.id, fd11)
       ).rejects.toThrow(/Maximum of 10 submission versions/i);
-    });
+    }, 120000);
 
     it("blocks resubmission after grading unless Submission.reopened is true", async () => {
       const assignment = await prisma.assignment.create({

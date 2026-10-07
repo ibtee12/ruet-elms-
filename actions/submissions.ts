@@ -14,6 +14,7 @@ import {
   uploadToSupabaseBucket,
   sanitizeDisplayName,
 } from "@/lib/storage";
+import { uploadRateLimiter } from "@/lib/rate-limiter";
 
 async function getSafeClientIp(): Promise<string> {
   try {
@@ -52,6 +53,15 @@ export async function submitAssignmentAction(
 
   // Basic offering view authorization check
   await assertCanViewOffering({ id: caller.id, role: caller.role }, offeringId);
+
+  // Rate limit uploads
+  const uploadStatus = await uploadRateLimiter.check(caller.id);
+  if (!uploadStatus.allowed) {
+    throw new ValidationError(
+      `Upload rate limit reached. Please wait ${uploadStatus.retryAfterSeconds}s before submitting again.`
+    );
+  }
+  await uploadRateLimiter.consume(caller.id);
 
   // 2. Extract and pre-validate File
   const file = formData.get("file") as File | null;
@@ -137,28 +147,12 @@ export async function submitAssignmentAction(
   }
 
   // 7. Atomic Database Transaction
-  const result = await prisma.$transaction(async (tx) => {
-    // Check enrollment if caller is student
-    if (caller.role === Role.STUDENT) {
-      const enrollment = await tx.enrollment.findFirst({
-        where: {
-          studentId: caller.id,
-          status: "ACTIVE",
-          section: {
-            offeringId,
-          },
-        },
-      });
+  const submissionStatus = isLate ? SubmissionStatus.LATE : SubmissionStatus.SUBMITTED;
 
-      if (!enrollment) {
-        throw new ForbiddenError("You are not actively enrolled in this course offering.");
-      }
-    }
-
-    const submissionStatus = isLate ? SubmissionStatus.LATE : SubmissionStatus.SUBMITTED;
-
-    // Atomically find or create the parent Submission to lock it
-    const submission = await tx.submission.upsert({
+  // 1. Ensure the parent Submission row exists before entering serialized version transaction
+  let parentSubmission;
+  try {
+    parentSubmission = await prisma.submission.upsert({
       where: {
         assignmentId_studentId: {
           assignmentId: assignment.id,
@@ -177,9 +171,59 @@ export async function submitAssignmentAction(
         grade: true,
       },
     });
+  } catch (err: unknown) {
+    if (
+      err &&
+      typeof err === "object" &&
+      "code" in err &&
+      err.code === "P2002"
+    ) {
+      // Race condition: concurrent submit created the record
+      parentSubmission = await prisma.submission.findUniqueOrThrow({
+        where: {
+          assignmentId_studentId: {
+            assignmentId: assignment.id,
+            studentId: caller.id,
+          },
+        },
+        include: {
+          grade: true,
+        },
+      });
+    } else {
+      throw err;
+    }
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    // Check enrollment if caller is student
+    if (caller.role === Role.STUDENT) {
+      const enrollment = await tx.enrollment.findFirst({
+        where: {
+          studentId: caller.id,
+          status: "ACTIVE",
+          section: {
+            offeringId,
+          },
+        },
+      });
+
+      if (!enrollment) {
+        throw new ForbiddenError("You are not actively enrolled in this course offering.");
+      }
+    }
+
+    // 2. Lock the parent submission row in Postgres to serialize concurrent version increments
+    await tx.$executeRaw`SELECT id FROM "Submission" WHERE id = ${parentSubmission.id} FOR UPDATE`;
+
+    // Re-check updated status, reopened, and grade
+    const freshSubmission = await tx.submission.findUniqueOrThrow({
+      where: { id: parentSubmission.id },
+      include: { grade: true },
+    });
 
     // Check if assignment has already been graded and whether it is reopened
-    if (submission.grade && !submission.reopened) {
+    if (freshSubmission.grade && !freshSubmission.reopened) {
       throw new ValidationError(
         "This assignment has already been graded and cannot be resubmitted."
       );
@@ -187,7 +231,7 @@ export async function submitAssignmentAction(
 
     // Check version count for throttle
     const currentVersionCount = await tx.submissionVersion.count({
-      where: { submissionId: submission.id },
+      where: { submissionId: freshSubmission.id },
     });
 
     if (currentVersionCount >= 10) {
@@ -198,7 +242,7 @@ export async function submitAssignmentAction(
 
     // Determine highest existing version number
     const latestVersion = await tx.submissionVersion.findFirst({
-      where: { submissionId: submission.id },
+      where: { submissionId: freshSubmission.id },
       orderBy: { versionNo: "desc" },
     });
 
@@ -207,7 +251,7 @@ export async function submitAssignmentAction(
     // Always create a new SubmissionVersion
     const version = await tx.submissionVersion.create({
       data: {
-        submissionId: submission.id,
+        submissionId: freshSubmission.id,
         versionNo: newVersionNo,
         fileKey: randomKey,
         originalName: sanitizedName,
@@ -220,7 +264,7 @@ export async function submitAssignmentAction(
 
     // Update parent Submission with currentVersionId and latest status
     await tx.submission.update({
-      where: { id: submission.id },
+      where: { id: freshSubmission.id },
       data: {
         currentVersionId: version.id,
         status: submissionStatus,
@@ -228,7 +272,7 @@ export async function submitAssignmentAction(
       },
     });
 
-    const submissionId = submission.id;
+    const submissionId = freshSubmission.id;
 
     // Write AuditLog: SUBMISSION_UPLOADED (assignmentId, versionNo)
     await tx.auditLog.create({

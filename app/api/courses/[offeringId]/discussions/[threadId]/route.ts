@@ -54,7 +54,7 @@ export async function POST(
     const post = await createDiscussionPost(parsed, {
       id: session.user.id,
       role: session.user.role,
-      name: session.user.name,
+      name: session.user.name ?? undefined,
     });
 
     return NextResponse.json({ post }, { status: 201 });

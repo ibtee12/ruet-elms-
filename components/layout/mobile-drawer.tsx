@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Role } from "@prisma/client";
 import { ROLE_NAVIGATION, NavItem } from "@/lib/navigation";
-import { GraduationCap, X } from "lucide-react";
+import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface MobileDrawerProps {
@@ -56,8 +57,13 @@ export function MobileDrawer({ role, isOpen, onClose }: MobileDrawerProps) {
           {/* Header */}
           <div className="flex items-center justify-between pb-4 border-b border-white/10">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-white">
-                <GraduationCap className="w-5 h-5" />
+              <div className="relative w-8 h-10 shrink-0">
+                <Image
+                  src="/images/ruet-logo.webp"
+                  alt="RUET Logo"
+                  fill
+                  className="object-contain"
+                />
               </div>
               <div>
                 <span className="text-xs uppercase tracking-widest text-teal-300 font-bold block leading-tight">

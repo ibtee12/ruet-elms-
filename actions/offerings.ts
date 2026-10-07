@@ -45,26 +45,28 @@ async function assertManageOffering(
   return offering;
 }
 
-export interface GetOfferingsParams {
-  term?: string;
-  academicYear?: string;
-  status?: CourseOfferingStatus;
-  departmentId?: string;
-  search?: string;
-  page?: number;
-  pageSize?: number;
-}
+import {
+  getOfferingsParamsSchema,
+  type GetOfferingsParams,
+  createOfferingSchema,
+  type CreateOfferingInput,
+  updateOfferingStatusSchema,
+  addSectionSchema,
+  renameSectionSchema,
+  sectionIdParamSchema,
+  assignOfferingTeacherSchema,
+  removeOfferingTeacherSchema,
+} from "@/lib/validations/offerings";
+
+export type { GetOfferingsParams, CreateOfferingInput };
 
 /**
  * Fetch course offerings with filtering by term, academic year, status, and department.
+ * Restricted to administrative roles (SUPER_ADMIN, DEPT_ADMIN).
  */
-export async function getOfferingsAction(params: GetOfferingsParams = {}) {
-  const caller = await requireRole(
-    Role.SUPER_ADMIN,
-    Role.DEPT_ADMIN,
-    Role.TEACHER,
-    Role.STUDENT
-  );
+export async function getOfferingsAction(rawParams: GetOfferingsParams = {}) {
+  const caller = await requireRole(Role.SUPER_ADMIN, Role.DEPT_ADMIN);
+  const params = getOfferingsParamsSchema.parse(rawParams);
 
   const page = Math.max(1, params.page || 1);
   const pageSize = Math.min(100, Math.max(5, params.pageSize || 20));
@@ -72,7 +74,7 @@ export async function getOfferingsAction(params: GetOfferingsParams = {}) {
 
   const where: Prisma.CourseOfferingWhereInput = {};
 
-  // DEPT_ADMIN is scoped to courses of their department
+  // DEPT_ADMIN is scoped strictly to courses of their department
   if (caller.role === Role.DEPT_ADMIN) {
     const callerDeptId = await getCallerDeptId(caller.id);
     where.course = { departmentId: callerDeptId };
@@ -149,6 +151,7 @@ export async function getOfferingsAction(params: GetOfferingsParams = {}) {
  * Fetch offering detail by ID with authorization checks.
  */
 export async function getOfferingDetailAction(offeringId: string) {
+  const validOfferingId = z.string().trim().min(1, "Offering ID is required.").parse(offeringId);
   const caller = await requireRole(
     Role.SUPER_ADMIN,
     Role.DEPT_ADMIN,
@@ -156,13 +159,13 @@ export async function getOfferingDetailAction(offeringId: string) {
     Role.STUDENT
   );
 
-  const canView = await canViewOffering(caller, offeringId);
+  const canView = await canViewOffering(caller, validOfferingId);
   if (!canView) {
     throw new ForbiddenError("You are not authorized to view this course offering.");
   }
 
   const offering = await prisma.courseOffering.findUniqueOrThrow({
-    where: { id: offeringId },
+    where: { id: validOfferingId },
     include: {
       course: {
         include: {
@@ -193,16 +196,18 @@ export async function getOfferingDetailAction(offeringId: string) {
   return offering;
 }
 
+
 /**
  * Create a new offering from a catalog course (Initial status: DRAFT).
  */
-export async function createOfferingAction(input: {
+export async function createOfferingAction(rawInput: {
   courseId: string;
   term: string;
   academicYear: string;
   syllabus?: string;
 }) {
   const caller = await requireRole(Role.SUPER_ADMIN, Role.DEPT_ADMIN);
+  const input = createOfferingSchema.parse(rawInput);
 
   const course = await prisma.course.findUniqueOrThrow({
     where: { id: input.courseId },
@@ -266,10 +271,12 @@ export async function updateOfferingStatusAction(
   offeringId: string,
   newStatus: CourseOfferingStatus
 ) {
+  const validOfferingId = z.string().trim().min(1, "Offering ID is required.").parse(offeringId);
+  const validStatus = z.nativeEnum(CourseOfferingStatus).parse(newStatus);
   const caller = await requireRole(Role.SUPER_ADMIN, Role.DEPT_ADMIN);
 
   // Guard against editing an already archived offering
-  const currentOffering = await assertOfferingWritable(offeringId);
+  const currentOffering = await assertOfferingWritable(validOfferingId);
 
   // DEPT_ADMIN permission check
   if (caller.role === Role.DEPT_ADMIN) {
@@ -282,11 +289,11 @@ export async function updateOfferingStatusAction(
   }
 
   // Publication requirements check
-  if (newStatus === CourseOfferingStatus.PUBLISHED) {
+  if (validStatus === CourseOfferingStatus.PUBLISHED) {
     const [sectionsCount, instructorsCount] = await Promise.all([
-      prisma.section.count({ where: { offeringId } }),
+      prisma.section.count({ where: { offeringId: validOfferingId } }),
       prisma.offeringTeacher.count({
-        where: { offeringId, role: OfferingTeacherRole.INSTRUCTOR },
+        where: { offeringId: validOfferingId, role: OfferingTeacherRole.INSTRUCTOR },
       }),
     ]);
 
@@ -312,14 +319,14 @@ export async function updateOfferingStatusAction(
 
   const updated = await prisma.$transaction(async (tx) => {
     const off = await tx.courseOffering.update({
-      where: { id: offeringId },
-      data: { status: newStatus },
+      where: { id: validOfferingId },
+      data: { status: validStatus },
     });
 
     const action =
-      newStatus === CourseOfferingStatus.PUBLISHED
+      validStatus === CourseOfferingStatus.PUBLISHED
         ? "OFFERING_PUBLISHED"
-        : newStatus === CourseOfferingStatus.ARCHIVED
+        : validStatus === CourseOfferingStatus.ARCHIVED
         ? "OFFERING_ARCHIVED"
         : "OFFERING_UPDATED";
 
@@ -327,9 +334,9 @@ export async function updateOfferingStatusAction(
       data: {
         action,
         objectType: "CourseOffering",
-        objectId: offeringId,
+        objectId: validOfferingId,
         userId: caller.id,
-        description: `Offering ${currentOffering.course.code} status transitioned to ${newStatus}`,
+        description: `Offering ${currentOffering.course.code} status transitioned to ${validStatus}`,
         ip: clientIp,
       },
     });
@@ -337,7 +344,7 @@ export async function updateOfferingStatusAction(
     return off;
   });
 
-  revalidatePath(`/dept/offerings/${offeringId}`);
+  revalidatePath(`/dept/offerings/${validOfferingId}`);
   revalidatePath("/dept/offerings");
   return { success: true, offering: updated };
 }
@@ -346,16 +353,14 @@ export async function updateOfferingStatusAction(
  * Add a section to an offering.
  */
 export async function addSectionAction(offeringId: string, name: string) {
-  const caller = await requireRole(Role.SUPER_ADMIN, Role.DEPT_ADMIN);
-  await assertManageOffering(caller, offeringId);
+  const validOfferingId = z.string().trim().min(1, "Offering ID is required.").parse(offeringId);
+  const trimmedName = z.string().trim().min(1, "Section name cannot be empty.").max(50).parse(name);
 
-  const trimmedName = name.trim();
-  if (!trimmedName) {
-    return { success: false, error: "Section name cannot be empty." };
-  }
+  const caller = await requireRole(Role.SUPER_ADMIN, Role.DEPT_ADMIN);
+  await assertManageOffering(caller, validOfferingId);
 
   const existing = await prisma.section.findUnique({
-    where: { offeringId_name: { offeringId, name: trimmedName } },
+    where: { offeringId_name: { offeringId: validOfferingId, name: trimmedName } },
   });
   if (existing) {
     return {
@@ -369,7 +374,7 @@ export async function addSectionAction(offeringId: string, name: string) {
 
   const section = await prisma.$transaction(async (tx) => {
     const sec = await tx.section.create({
-      data: { offeringId, name: trimmedName },
+      data: { offeringId: validOfferingId, name: trimmedName },
     });
 
     await tx.auditLog.create({
@@ -378,7 +383,7 @@ export async function addSectionAction(offeringId: string, name: string) {
         objectType: "Section",
         objectId: sec.id,
         userId: caller.id,
-        description: `Added ${sec.name} to offering ${offeringId}`,
+        description: `Added ${sec.name} to offering ${validOfferingId}`,
         ip: clientIp,
       },
     });
@@ -386,7 +391,7 @@ export async function addSectionAction(offeringId: string, name: string) {
     return sec;
   });
 
-  revalidatePath(`/dept/offerings/${offeringId}`);
+  revalidatePath(`/dept/offerings/${validOfferingId}`);
   return { success: true, section };
 }
 
@@ -394,23 +399,21 @@ export async function addSectionAction(offeringId: string, name: string) {
  * Rename a section.
  */
 export async function renameSectionAction(sectionId: string, newName: string) {
+  const validSectionId = z.string().trim().min(1, "Section ID is required.").parse(sectionId);
+  const trimmed = z.string().trim().min(1, "Section name cannot be empty.").max(50).parse(newName);
+
   const caller = await requireRole(Role.SUPER_ADMIN, Role.DEPT_ADMIN);
 
   const section = await prisma.section.findUniqueOrThrow({
-    where: { id: sectionId },
+    where: { id: validSectionId },
   });
   await assertManageOffering(caller, section.offeringId);
-
-  const trimmed = newName.trim();
-  if (!trimmed) {
-    return { success: false, error: "Section name cannot be empty." };
-  }
 
   const duplicate = await prisma.section.findFirst({
     where: {
       offeringId: section.offeringId,
       name: trimmed,
-      NOT: { id: sectionId },
+      NOT: { id: validSectionId },
     },
   });
   if (duplicate) {
@@ -425,7 +428,7 @@ export async function renameSectionAction(sectionId: string, newName: string) {
 
   const updated = await prisma.$transaction(async (tx) => {
     const sec = await tx.section.update({
-      where: { id: sectionId },
+      where: { id: validSectionId },
       data: { name: trimmed },
     });
 
@@ -451,10 +454,11 @@ export async function renameSectionAction(sectionId: string, newName: string) {
  * Remove an empty section.
  */
 export async function removeSectionAction(sectionId: string) {
+  const validSectionId = z.string().trim().min(1, "Section ID is required.").parse(sectionId);
   const caller = await requireRole(Role.SUPER_ADMIN, Role.DEPT_ADMIN);
 
   const section = await prisma.section.findUniqueOrThrow({
-    where: { id: sectionId },
+    where: { id: validSectionId },
     include: { _count: { select: { enrollments: true } } },
   });
   await assertManageOffering(caller, section.offeringId);
@@ -470,13 +474,13 @@ export async function removeSectionAction(sectionId: string) {
   const clientIp = getClientIp(headerList);
 
   await prisma.$transaction(async (tx) => {
-    await tx.section.delete({ where: { id: sectionId } });
+    await tx.section.delete({ where: { id: validSectionId } });
 
     await tx.auditLog.create({
       data: {
         action: "SECTION_CHANGED",
         objectType: "Section",
-        objectId: sectionId,
+        objectId: validSectionId,
         userId: caller.id,
         description: `Deleted section ${section.name}`,
         ip: clientIp,
@@ -496,11 +500,15 @@ export async function assignOfferingTeacherAction(
   userId: string,
   role: OfferingTeacherRole
 ) {
+  const validOfferingId = z.string().trim().min(1, "Offering ID is required.").parse(offeringId);
+  const validUserId = z.string().trim().min(1, "User ID is required.").parse(userId);
+  const validRole = z.nativeEnum(OfferingTeacherRole).parse(role);
+
   const caller = await requireRole(Role.SUPER_ADMIN, Role.DEPT_ADMIN);
-  await assertManageOffering(caller, offeringId);
+  await assertManageOffering(caller, validOfferingId);
 
   const teacher = await prisma.user.findFirst({
-    where: { id: userId, role: Role.TEACHER, isActive: true },
+    where: { id: validUserId, role: Role.TEACHER, isActive: true },
     include: { teacherProfile: true },
   });
   if (!teacher || !teacher.teacherProfile) {
@@ -512,9 +520,9 @@ export async function assignOfferingTeacherAction(
 
   const assigned = await prisma.$transaction(async (tx) => {
     const item = await tx.offeringTeacher.upsert({
-      where: { offeringId_userId: { offeringId, userId } },
-      update: { role },
-      create: { offeringId, userId, role },
+      where: { offeringId_userId: { offeringId: validOfferingId, userId: validUserId } },
+      update: { role: validRole },
+      create: { offeringId: validOfferingId, userId: validUserId, role: validRole },
       include: {
         user: {
           select: {
@@ -538,7 +546,7 @@ export async function assignOfferingTeacherAction(
         objectType: "OfferingTeacher",
         objectId: item.id,
         userId: caller.id,
-        description: `Assigned ${item.user.name} as ${role} for offering ${offeringId}`,
+        description: `Assigned ${item.user.name} as ${validRole} for offering ${validOfferingId}`,
         ip: clientIp,
       },
     });
@@ -546,7 +554,7 @@ export async function assignOfferingTeacherAction(
     return item;
   });
 
-  revalidatePath(`/dept/offerings/${offeringId}`);
+  revalidatePath(`/dept/offerings/${validOfferingId}`);
   return { success: true, teacher: assigned };
 }
 
@@ -557,15 +565,18 @@ export async function removeOfferingTeacherAction(
   offeringId: string,
   userId: string
 ) {
+  const validOfferingId = z.string().trim().min(1, "Offering ID is required.").parse(offeringId);
+  const validUserId = z.string().trim().min(1, "User ID is required.").parse(userId);
+
   const caller = await requireRole(Role.SUPER_ADMIN, Role.DEPT_ADMIN);
-  await assertManageOffering(caller, offeringId);
+  await assertManageOffering(caller, validOfferingId);
 
   const headerList = await headers();
   const clientIp = getClientIp(headerList);
 
   await prisma.$transaction(async (tx) => {
     const item = await tx.offeringTeacher.delete({
-      where: { offeringId_userId: { offeringId, userId } },
+      where: { offeringId_userId: { offeringId: validOfferingId, userId: validUserId } },
     });
 
     await tx.auditLog.create({
@@ -574,13 +585,13 @@ export async function removeOfferingTeacherAction(
         objectType: "OfferingTeacher",
         objectId: item.id,
         userId: caller.id,
-        description: `Removed teacher assignment ${userId} from offering ${offeringId}`,
+        description: `Removed teacher assignment ${validUserId} from offering ${validOfferingId}`,
         ip: clientIp,
       },
     });
   });
 
-  revalidatePath(`/dept/offerings/${offeringId}`);
+  revalidatePath(`/dept/offerings/${validOfferingId}`);
   return { success: true };
 }
 

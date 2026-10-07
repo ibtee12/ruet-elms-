@@ -168,6 +168,7 @@ export const authOptions: NextAuthOptions = {
   jwt: {
     maxAge: 8 * 60 * 60, // 8 hours
   },
+  useSecureCookies: process.env.NODE_ENV === "production",
   cookies: {
     sessionToken: {
       name:

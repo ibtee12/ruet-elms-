@@ -19,6 +19,7 @@ import {
   deleteFromSupabaseBucket,
   sanitizeDisplayName,
 } from "@/lib/storage";
+import { uploadRateLimiter } from "@/lib/rate-limiter";
 import { z } from "zod";
 
 async function getSafeClientIp(): Promise<string> {
@@ -225,6 +226,16 @@ export async function uploadMaterialFileAction(formData: FormData) {
   if (caller.role === Role.TEACHER) {
     await assertOfferingTeacher(caller.id, offeringId);
   }
+
+  // Rate limit uploads
+  const uploadStatus = await uploadRateLimiter.check(caller.id);
+  if (!uploadStatus.allowed) {
+    return {
+      success: false,
+      error: `Upload rate limit reached. Please wait ${uploadStatus.retryAfterSeconds}s before uploading again.`,
+    };
+  }
+  await uploadRateLimiter.consume(caller.id);
 
   // Read file bytes into Buffer
   const arrayBuffer = await file.arrayBuffer();

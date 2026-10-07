@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { sendPasswordResetEmail } from "@/lib/email";
 import { validatePasswordAgainstPolicy } from "@/lib/validations/password";
+import { passwordResetRateLimiter } from "@/lib/rate-limiter";
 
 export const GENERIC_FORGOT_PASSWORD_RESPONSE =
   "If an account exists with that email address, you will receive password reset instructions shortly.";
@@ -18,13 +19,28 @@ export function hashResetToken(rawToken: string): string {
  * Initiates the password reset flow.
  * Always returns the same response message regardless of user existence.
  * Normalizes timing to prevent user enumeration attacks.
+ * Rate limited to prevent denial-of-service / email flooding.
  */
 export async function requestPasswordReset(
   email: string,
   clientIp: string = "127.0.0.1",
   baseUrl: string = process.env.NEXTAUTH_URL || "http://localhost:3000"
 ) {
+  const startOpTime = performance.now();
   const normalizedEmail = email?.toLowerCase().trim();
+
+  // Rate limit check
+  const rateLimitKey = `reset:${clientIp}:${normalizedEmail || "unknown"}`;
+  const rateLimitStatus = await passwordResetRateLimiter.check(rateLimitKey);
+  if (!rateLimitStatus.allowed) {
+    return {
+      success: false,
+      error: `Too many password reset requests. Please wait ${Math.ceil(
+        rateLimitStatus.retryAfterSeconds / 60
+      )} minutes before trying again.`,
+    };
+  }
+  await passwordResetRateLimiter.consume(rateLimitKey);
 
   // Find user by email
   const user = normalizedEmail
@@ -76,9 +92,16 @@ export async function requestPasswordReset(
       },
     });
   } else {
-    // Prevent timing analysis: perform a dummy cryptographic calculation
+    // Prevent timing analysis: perform equivalent cryptographic and database operations
     const dummyToken = crypto.randomBytes(32).toString("hex");
     hashResetToken(dummyToken);
+    await prisma.passwordResetToken.deleteMany({ where: { userId: "dummy_nonexistent_id" } });
+    await sendPasswordResetEmail({
+      to: "dummy@ruet.ac.bd",
+      resetUrl: `${baseUrl}/reset-password/${dummyToken}`,
+      recipientName: "User",
+    });
+    await prisma.auditLog.findFirst({ where: { id: "dummy_nonexistent_id" } });
   }
 
   return {

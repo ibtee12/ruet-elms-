@@ -30,6 +30,14 @@ export function AppShell({ user, children }: AppShellProps) {
 
   return (
     <div className="min-h-screen flex bg-background text-foreground">
+      {/* Skip to Content Link for Keyboard Accessibility */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-ring font-medium text-sm"
+      >
+        Skip to main content
+      </a>
+
       {/* Desktop Sidebar (Navy 256px / Collapsible) */}
       <Sidebar
         role={user.role}
@@ -52,8 +60,10 @@ export function AppShell({ user, children }: AppShellProps) {
         />
 
         <main
+          id="main-content"
+          tabIndex={-1}
           className={cn(
-            "flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto overflow-y-auto",
+            "flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto overflow-y-auto outline-none",
             isStudent && "pb-20 md:pb-8" // Add bottom clearance on mobile for student tab bar
           )}
         >

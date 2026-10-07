@@ -2,8 +2,9 @@ import * as React from "react";
 import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
+import Image from "next/image";
 import { prisma } from "@/lib/prisma";
-import { GraduationCap, KeyRound, AlertTriangle } from "lucide-react";
+import { KeyRound, AlertTriangle } from "lucide-react";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { LogoutButton } from "@/components/shared/logout-button";
 import { ChangePasswordForm } from "./change-password-form";
@@ -40,9 +41,14 @@ export default async function ChangePasswordPage() {
     <main className="min-h-screen flex flex-col justify-between p-6 sm:p-10 bg-background text-foreground">
       {/* Top Header */}
       <header className="flex items-center justify-between w-full max-w-xl mx-auto">
-        <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-white shadow-sm">
-            <GraduationCap className="w-6 h-6" />
+        <div className="flex items-center gap-3">
+          <div className="relative w-8 h-10 shrink-0">
+            <Image
+              src="/images/ruet-logo.webp"
+              alt="RUET Logo"
+              fill
+              className="object-contain"
+            />
           </div>
           <div>
             <span className="text-xs uppercase tracking-widest text-primary font-semibold block leading-tight">

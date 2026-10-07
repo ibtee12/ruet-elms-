@@ -70,9 +70,9 @@ export function Topbar({ user, onOpenMobileMenu }: TopbarProps) {
         </button>
 
         <div>
-          <h1 className="text-base sm:text-lg font-bold text-foreground tracking-tight leading-tight">
+          <p className="text-base sm:text-lg font-bold text-foreground tracking-tight leading-tight">
             {getPageTitle()}
-          </h1>
+          </p>
           <p className="hidden sm:block text-[11px] text-muted">
             Rajshahi University of Engineering &amp; Technology • Even Term 2026
           </p>

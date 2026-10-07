@@ -18,6 +18,7 @@ import {
   deleteFromSupabaseBucket,
   sanitizeDisplayName,
 } from "@/lib/storage";
+import { uploadRateLimiter } from "@/lib/rate-limiter";
 import { sanitizeHtml } from "@/lib/sanitize";
 import { formatDhaka } from "@/lib/datetime";
 import { createBulkNotifications } from "@/lib/notifications";
@@ -503,6 +504,15 @@ export async function uploadAssignmentAttachmentAction(
   if (caller.role === Role.TEACHER) {
     await assertOfferingTeacher(caller.id, offeringId);
   }
+
+  // Rate limit uploads
+  const uploadStatus = await uploadRateLimiter.check(caller.id);
+  if (!uploadStatus.allowed) {
+    throw new ValidationError(
+      `Upload rate limit reached. Please wait ${uploadStatus.retryAfterSeconds}s before uploading again.`
+    );
+  }
+  await uploadRateLimiter.consume(caller.id);
 
   const file = formData.get("file") as File | null;
   if (!file || !(file instanceof File) || file.size === 0) {

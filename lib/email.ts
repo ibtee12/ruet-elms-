@@ -12,6 +12,13 @@ export interface EmailResult {
   error?: string;
 }
 
+function shouldSimulateEmail(): boolean {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || apiKey === "re_123456789") return true;
+  if (process.env.NODE_ENV === "test" || Boolean(process.env.VITEST)) return true;
+  return false;
+}
+
 /**
  * Fail-safe email helper: logs errors and never throws into the calling action.
  */
@@ -23,10 +30,10 @@ export async function sendPasswordResetEmail({
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || "RUET ELMS <noreply@ruet.ac.bd>";
 
-  if (!apiKey || apiKey === "re_123456789") {
-    // In local development or testing with placeholder key, simulate delivery
+  if (shouldSimulateEmail()) {
+    // In test mode or local development with placeholder key, simulate delivery
     console.info(
-      `[Email] Development mode: Simulated password reset email to ${to}.\nReset Link: ${resetUrl}`
+      `[Email] Simulated password reset email to ${to}.\nReset Link: ${resetUrl}`
     );
     return {
       success: true,
@@ -119,9 +126,9 @@ export async function sendWelcomeEmail({
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || "RUET ELMS <noreply@ruet.ac.bd>";
 
-  if (!apiKey || apiKey === "re_123456789") {
+  if (shouldSimulateEmail()) {
     console.info(
-      `[Email] Development mode: Simulated welcome email to ${to} (Role: ${role}).\nTemp Password: ${tempPassword}`
+      `[Email] Simulated welcome email to ${to} (Role: ${role}).\nTemp Password: ${tempPassword}`
     );
     return {
       success: true,
@@ -173,9 +180,9 @@ export async function sendUrgentNotificationEmail({
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || "RUET ELMS <noreply@ruet.ac.bd>";
 
-  if (!apiKey || apiKey === "re_123456789") {
+  if (shouldSimulateEmail()) {
     console.info(
-      `[Email] Development mode: Simulated urgent notification email to ${to}.\nTitle: ${title}\nMessage: ${message}`
+      `[Email] Simulated urgent notification email to ${to}.\nTitle: ${title}\nMessage: ${message}`
     );
     return {
       success: true,

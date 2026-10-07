@@ -9,36 +9,28 @@ import {
   ChevronRight,
   Filter,
   RotateCcw,
-  Calendar,
-  User as UserIcon,
   Clock,
-  Layers,
-  Globe,
   ChevronLeft,
   ChevronsLeft,
   ChevronsRight,
-  AlertCircle,
-  CheckCircle2,
-  X,
   FileText,
   Copy,
   Check,
 } from "lucide-react";
-import { GetAuditLogsResult, AuditLogRow } from "@/services/audit-logs";
+import { GetAuditLogsResult } from "@/services/audit-logs";
 import { FilterOptions, fetchAuditLogsAction } from "@/actions/audit-logs";
 
 interface AuditLogViewerProps {
   initialData: GetAuditLogsResult;
   filterOptions: FilterOptions;
   isDeptAdmin: boolean;
-  callerRole: string;
+  callerRole?: string;
 }
 
 export function AuditLogViewer({
   initialData,
   filterOptions,
   isDeptAdmin,
-  callerRole,
 }: AuditLogViewerProps) {
   const [data, setData] = useState<GetAuditLogsResult>(initialData);
   const [isPending, startTransition] = useTransition();

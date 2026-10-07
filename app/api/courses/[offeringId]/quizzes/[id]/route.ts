@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { Role } from "@prisma/client";
-import { assertEnrolled } from "@/lib/auth/guards";
+import { assertEnrolled, canViewOffering } from "@/lib/auth/guards";
 import { getStudentQuizQuestions } from "@/services/quizzes";
 import { prisma } from "@/lib/prisma";
 
@@ -17,10 +17,15 @@ export async function GET(
     }
 
     const { offeringId, id: quizId } = await params;
+    const user = session.user as { id: string; role: Role };
 
-    // If caller is student, verify enrollment
-    if (session.user.role === Role.STUDENT) {
-      await assertEnrolled(session.user.id, offeringId);
+    // Verify offering access
+    const allowed = await canViewOffering(user, offeringId);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Forbidden: You are not authorized to view quizzes for this course offering." },
+        { status: 403 }
+      );
     }
 
     const quiz = await prisma.quiz.findUnique({

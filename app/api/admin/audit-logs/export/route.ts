@@ -60,11 +60,13 @@ export async function GET(request: NextRequest) {
         "Cache-Control": "no-store, no-cache, must-revalidate",
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Audit log CSV export error:", err);
+    const errorMessage =
+      err instanceof Error ? err.message : "Internal server error exporting audit logs.";
     return new NextResponse(
       JSON.stringify({
-        error: err?.message || "Internal server error exporting audit logs.",
+        error: errorMessage,
       }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
